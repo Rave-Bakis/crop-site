@@ -39,7 +39,7 @@
   var shell=document.createElement('div');shell.className='dash-shell';shell.appendChild(base.querySelector('.dash-sidebar').cloneNode(true));
   var main=document.createElement('div');main.className='dash-main';main.appendChild(base.querySelector('.dash-topbar').cloneNode(true));
   var content=document.createElement('div');content.className='sret-main';main.appendChild(content);shell.appendChild(main);view.appendChild(shell);
-  document.body.insertBefore(view,document.querySelector('script'));
+  document.body.appendChild(view);
   document.querySelectorAll('.dash-sidebar .group').forEach(function(group){var gra=Array.from(group.querySelectorAll('.subitem')).find(function(b){return b.textContent.trim()==='GRA Processing';});if(!gra)return;var nav=document.createElement('button');nav.type='button';nav.className='subitem sret-nav';nav.textContent='Supplier Returns';nav.onclick=function(){openSupplierReturns();};gra.insertAdjacentElement('afterend',nav);});
   function activate(){showView('supplier-returns');view.querySelectorAll('.subitem').forEach(function(b){b.classList.toggle('active',b.classList.contains('sret-nav'));});}
   function heading(title,subtitle,button){return '<div class="gra-hero" style="align-items:center"><div><h1 style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:24px;font-weight:800;color:#1a3c6e;margin:0">'+title+'</h1><p class="gra-subtitle">'+subtitle+'</p></div>'+(button||'')+'</div>';}
