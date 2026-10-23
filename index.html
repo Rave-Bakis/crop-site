@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="supplier-returns.css">
+<link rel="stylesheet" href="lpo-figma.css">
 <style>
   :root{
     --cyan:#22d3ee;
@@ -13181,6 +13183,14 @@ function submitRecordInvoice(){
     tbody.insertBefore(tr, tbody.firstChild);
   }
 
+  if(window.registerSupplierReturnInvoice && window.lpoData && lpoData[lpoRef]){
+    window.registerSupplierReturnInvoice({
+      id: invoiceNumber,
+      po: lpoRef,
+      total: parseFloat(totalDue.replace(/[^0-9.]/g, '')) || 0,
+      dueDate: dueDate !== '—' ? dueDate : ''
+    });
+  }
   var wentToGra = recordInvoiceOrigin === 'gra-view' || recordInvoiceOrigin === 'gra-partial';
   var targetView = recordInvoiceOrigin === 'gra-view' ? 'gra-processing-view' : (recordInvoiceOrigin === 'gra-partial' ? 'gra-processing-partial' : 'supplier-invoices');
   alert(wentToGra ? 'Invoice ' + invoiceNumber + ' recorded and linked to this GRA — also added to Supplier Invoices.' : 'Invoice ' + invoiceNumber + ' recorded and added to Supplier Invoices.');
@@ -15106,5 +15116,7 @@ function updateDemoToggleLabel(){
 renderBillingStatus();
 updateDemoToggleLabel();
 </script>
+<script src="lpo-figma.js"></script>
+<script src="supplier-returns.js"></script>
 </body>
 </html>
