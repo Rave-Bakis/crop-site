@@ -29,7 +29,7 @@
       // Refuse stale writes from another open tab rather than overwrite its changes.
       var existing = localStorage.getItem(key);
       if (existing && JSON.stringify(JSON.parse(existing)) !== JSON.stringify(state)) { alert('Credit records changed in another tab. Reload this page before saving.'); return false; }
-      localStorage.setItem(key, JSON.stringify(next)); state = next; return true;
+      localStorage.setItem(key, JSON.stringify(next)); state = next; syncCreditOrders(); return true;
     } catch (e) { alert('Unable to save. Browser storage may be full or unavailable. Your changes have not been recorded.'); return false; }
   }
   function canRecordPayment() { return /^(super admin|admin|business owner|owner)$/i.test(invoiceView.querySelector('.dash-user-role').textContent.trim()); }
@@ -302,5 +302,66 @@
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
   });
   document.addEventListener('keydown',function(event){if(!overlay.classList.contains('open'))return;if(event.key==='Escape')closeAddCustomerModal();if(event.key==='Tab'){var list=Array.from(modal.querySelectorAll('button,input,select,textarea')).filter(function(el){return !el.disabled;});var first=list[0],last=list[list.length-1];if(event.shiftKey&&document.activeElement===first){last.focus();event.preventDefault();}else if(!event.shiftKey&&document.activeElement===last){first.focus();event.preventDefault();}}});
+  // Credit orders are projections of saved invoices, so payment changes cannot
+  // leave an independent order copy out of date or create duplicate orders.
+  var ordersView=document.getElementById('view-orders');
+  var ordersBody=ordersView.querySelector('.ord-table tbody');
+  var orderSearch=ordersView.querySelector('.ord-table-search input');
+  var entityFilter=document.getElementById('ord-entity-filter');
+  var marketplaceFilter=document.querySelector('#ord-marketplace-filter-wrap select');
+  var orderTab='All Orders';
+  var existingOrders=Array.from(ordersBody.rows);
+  var orderBadgeBases=Array.from(document.querySelectorAll('[data-badge="orders"]')).map(function(el){return {el:el,count:Number(el.textContent)||0};});
+  existingOrders.forEach(function(row){row.dataset.entity=row.querySelector('.ord-entity').textContent.trim();row.dataset.status=row.querySelector('.ord-status').textContent.trim();});
+  ['Store','User'].forEach(function(entity){var option=document.createElement('option');option.textContent=entity;entityFilter.appendChild(option);});
+  var creditTab=document.createElement('button');creditTab.type='button';creditTab.textContent='Credit Orders';ordersView.querySelector('.ord-tabs').appendChild(creditTab);
+  ordersView.querySelectorAll('.ord-tabs button').forEach(function(button){button.type='button';button.onclick=function(){orderTab=button.textContent.trim();ordersView.querySelectorAll('.ord-tabs button').forEach(function(b){b.classList.toggle('active',b===button);});filterCreditOrders();};});
+  orderSearch.addEventListener('input',filterCreditOrders);
+  entityFilter.addEventListener('change',filterCreditOrders);
+  marketplaceFilter.addEventListener('change',filterCreditOrders);
+  function creditOrderNumber(i){return '#CR-'+i.number.replace(/^INV-/, '');}
+  function syncCreditOrders(){
+    if(!ordersBody)return;
+    ordersBody.querySelectorAll('[data-credit-invoice]').forEach(function(row){row.remove();});
+    var fragment=document.createDocumentFragment();
+    state.invoices.slice().reverse().forEach(function(i){
+      var row=document.createElement('tr'),entity=i.customer.type==='store'?'Store':'User';
+      row.dataset.creditInvoice=i.id;row.dataset.entity=entity;row.dataset.status='Completed';
+      var initials=i.customer.name.split(/\s+/).slice(0,2).map(function(n){return n[0]||'';}).join('').toUpperCase();
+      row.innerHTML='<td class="ord-id"><button type="button" class="ci-link" data-id="'+esc(i.id)+'" onclick="ciOpenCreditOrder(this.dataset.id)">'+esc(creditOrderNumber(i))+'</button><small class="ci-order-meta">Invoice '+esc(i.number)+'</small></td><td><div class="ord-customer"><div class="ord-avatar">'+esc(initials)+'</div><div><span class="ord-customer-name">'+esc(i.customer.name)+'</span><small class="ci-order-meta">'+esc(i.customer.email||i.customer.phone||'')+'</small></div></div></td><td><span class="ord-entity virtual">'+entity+'</span><small class="ci-order-meta">Credit Order</small></td><td><div class="ord-date">'+date(i.date)+'</div><div class="ord-time">Due '+date(i.dueDate)+'</div></td><td class="ord-total">'+money(i.total)+'<small class="ci-order-meta">Balance: '+money(balance(i))+'</small></td><td><span class="ord-status completed">Completed</span><div class="ci-order-payment">'+badge(i)+'</div></td><td><div class="ord-delivery"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.3"><path d="M1 4.5 8 1l7 3.5-7 3.5-7-3.5Z"/><path d="M1 4.5v7L8 15l7-3.5v-7"/></svg>Pickup</div></td><td><button type="button" class="ord-action-btn" aria-label="View order '+esc(creditOrderNumber(i))+'" data-id="'+esc(i.id)+'" onclick="ciOpenCreditOrder(this.dataset.id)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.3"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5Z"/><circle cx="8" cy="8" r="2"/></svg></button></td>';
+      fragment.appendChild(row);
+    });
+    ordersBody.prepend(fragment);
+    orderBadgeBases.forEach(function(item){item.el.textContent=item.count+state.invoices.length;});
+    filterCreditOrders();
+  }
+  function filterCreditOrders(){
+    var q=orderSearch.value.trim().toLowerCase(),entity=entityFilter.value,marketplace=marketplaceFilter.value,visible=0;
+    ordersBody.querySelectorAll('.ci-orders-empty').forEach(function(row){row.remove();});
+    Array.from(ordersBody.rows).forEach(function(row){
+      var status=row.dataset.status,tab=orderTab==='All Orders'||(orderTab==='Credit Orders'?!!row.dataset.creditInvoice:orderTab==='Delivered / Completed'?['Delivered','Completed'].includes(status):status===orderTab);
+      var match=tab&&(entity==='All Entities'||row.dataset.entity===entity)&&(entity!=='Marketplace'||marketplace==='All Marketplaces'||row.cells[1].textContent.includes(marketplace))&&(!q||row.textContent.toLowerCase().includes(q));
+      row.hidden=!match;if(match)visible++;
+    });
+    if(!visible){var empty=document.createElement('tr');empty.className='ci-orders-empty';empty.innerHTML='<td colspan="8" class="ci-empty">No orders match these filters.</td>';ordersBody.appendChild(empty);}
+    ordersView.querySelector('.ord-pagination-info').textContent='Showing '+visible+' of '+(existingOrders.length+state.invoices.length)+' loaded orders';
+  }
+  var creditOrderView=document.createElement('div');creditOrderView.id='view-credit-order-detail';creditOrderView.className='view';
+  var orderShell=document.createElement('div');orderShell.className='dash-shell';orderShell.appendChild(ordersView.querySelector('.dash-sidebar').cloneNode(true));
+  var orderMain=document.createElement('div');orderMain.className='dash-main';orderMain.appendChild(ordersView.querySelector('.dash-topbar').cloneNode(true));
+  var orderContent=document.createElement('div');orderContent.className='ci-order-content';orderMain.appendChild(orderContent);orderShell.appendChild(orderMain);creditOrderView.appendChild(orderShell);document.body.appendChild(creditOrderView);
+  creditOrderView.querySelectorAll('[data-badge="orders"]').forEach(function(el){orderBadgeBases.push({el:el,count:Number(el.textContent)||0});});
+  window.ciOpenCreditOrder=function(id){
+    var i=state.invoices.find(function(i){return i.id===id;});if(!i)return;
+    var entity=i.customer.type==='store'?'Store':'User';
+    orderContent.innerHTML='<div class="od-hero"><h1>Order Details <span>'+esc(creditOrderNumber(i))+'</span></h1><div class="od-hero-actions"><button type="button" class="od-btn-outline" onclick="showView(\'orders\')">Back</button><button type="button" class="od-btn-outline" data-id="'+esc(i.id)+'" onclick="ciPrintInvoice(this.dataset.id)">Print Invoice</button><button type="button" class="od-btn-primary" data-id="'+esc(i.id)+'" onclick="ciOpenInvoice(this.dataset.id)">View Credit Invoice / Record Payment</button></div></div><div class="od-grid"><div class="od-left"><div class="od-summary-card"><div class="od-summary-cols"><div><div class="od-summary-lbl">Order Status</div><span class="ord-status completed">Completed</span><p class="ci-muted">Credit Order · '+esc(i.number)+'</p></div><div><div class="od-summary-lbl">Order Date</div><p class="od-date-val">'+date(i.date)+'</p><p class="od-date-time">Payment due '+date(i.dueDate)+'</p></div><div><div class="od-summary-lbl">Total Amount</div><p class="od-total-val">'+money(i.total)+'</p></div></div></div><div class="od-items-card"><div class="od-items-head"><h3>Order Items</h3><span class="od-items-count">'+i.items.length+' line items</span></div><div class="ci-table-wrap"><table class="od-table"><thead><tr><th>Product</th><th>Price</th><th class="center">Qty</th><th class="right">Subtotal</th></tr></thead><tbody>'+i.items.map(function(item){return '<tr><td><div class="od-prod-name">'+esc(item.description)+'</div></td><td class="od-price">'+money(item.unitPrice)+'</td><td class="od-qty">'+item.quantity+'</td><td class="od-subtotal">'+money(item.total)+'</td></tr>';}).join('')+'</tbody></table></div>'+[['Subtotal',i.subtotal],['VAT (7.5%)',i.vat],['Grand Total',i.total],['Amount Paid',paidAmount(i)],['Balance Due',balance(i)]].map(function(row,index){return '<div class="od-foot-row '+(index===2?'total':'')+'"><span class="od-foot-lbl">'+row[0]+'</span><span class="od-foot-val">'+money(row[1])+'</span></div>';}).join('')+'</div><div class="od-side-card"><h3>Credit Terms &amp; Notes</h3><p class="ci-notes ci-muted">'+esc(i.notes||'No additional notes.')+'</p></div></div><div class="od-right"><div class="od-side-card"><div class="od-cust-head"><div><div class="od-cust-name">'+esc(i.customer.name)+'</div><span class="od-cust-badge">'+entity+' Profile</span></div></div><div class="od-cust-details">'+[['Contact Person',i.customer.contactName],['Email',i.customer.email],['Phone',i.customer.phone],['Customer Address',i.customer.address]].map(function(row){return '<div class="ci-order-contact"><span>'+row[0]+'</span><strong>'+esc(row[1]||'—')+'</strong></div>';}).join('')+'</div></div><div class="od-side-card"><h3>Payment Details</h3>'+detailRow('Method','Credit')+detailRow('Invoice',esc(i.number))+detailRow('Due Date',date(i.dueDate))+detailRow('Status',badge(i))+detailRow('Amount Paid',money(paidAmount(i)))+detailRow('Balance Due',money(balance(i)))+'</div><div class="od-side-card"><h3>Fulfilment Details</h3><div class="od-ship-title">Pickup</div><p class="ci-muted">Collect this credit order in store.</p></div></div></div>';
+    showView('credit-order-detail');
+    creditOrderView.querySelectorAll('.subitem').forEach(function(button){button.classList.toggle('active',button.getAttribute('onclick')==="showView('orders')");});
+  };
+  // Refresh on every visit as well as every successful invoice/payment save.
+  var previousShowView=window.showView;
+  window.showView=function(name){if(name==='orders')syncCreditOrders();return previousShowView.apply(this,arguments);};
+  syncCreditOrders();
+
   if(storageError)notify(storageError);
 })();
