@@ -176,5 +176,6 @@
   eligiblePos.forEach(function(po){var data=poData[po];lpoInvoiceData[po]={supplier:data.supplier,gra:graByPo[po],items:data.items.map(function(it){return {name:it.name,qty:it.qtyPurchased,cost:it.unitCost};})};var select=document.getElementById('ri-lpo-select');if(select&&!Array.from(select.options).some(function(o){return o.value===po;})){var option=document.createElement('option');option.value=po;option.textContent=po;select.appendChild(option);}});
   var supplierSelect=document.getElementById('ri-supplier-select');eligiblePos.forEach(function(po){var supplier=poData[po].supplier;if(supplierSelect&&!Array.from(supplierSelect.options).some(function(o){return o.value===supplier;})){var option=document.createElement('option');option.value=supplier;option.textContent=supplier;supplierSelect.appendChild(option);}});
   function refreshAll(){renderLpoList();renderGraRows();renderStockRows();renderInvoiceRows();var current=document.getElementById('lpo-title').textContent.match(/PO-\d+/);if(current&&poData[current[0]])renderLpoDetails(current[0]);}
+  window.getSupplierProcurementSnapshot=function(){return JSON.parse(JSON.stringify({invoices:invoices,returns:returns,receivedPurchaseOrders:graByPo}));};
   refreshAll();
 })();
