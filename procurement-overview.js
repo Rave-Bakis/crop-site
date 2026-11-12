@@ -15,8 +15,8 @@
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
   function round(v) { return Math.round((Number(v) + Number.EPSILON) * 100) / 100; }
-  function amount(v) { return Number(String(v || '').replace(/[^\d.-]/g, '')) || 0; }
-  function money(v) { return '₦' + Number(v || 0).toLocaleString('en-NG', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function amount(v) { return cropMarket.parse(v); }
+  function money(v) { return window.cropMarket.format(v,2); }
   function today() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
   function day(v) {
     if (!v || v === '—') return '';
@@ -283,7 +283,7 @@
     detailOverlay.classList.add('open');detailOverlay.querySelector('button').focus();
   };
   function exportRows(rows,name){var csv=rows.map(function(row){return row.map(function(value){var text=String(value==null?'':value);if(/^[=+@\-\t\r]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');var url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=url;a.download=name+'-'+today()+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
-  window.povExport=function(){var records=filtered(buildRecords());exportRows([['Reference','Date','Supplier','Branch','Purchase Value','Supplier Returns','Net Purchase Value','Paid to Suppliers','Invoiced Balance Due','Procurement Status','Payment Status']].concat(records.map(function(r){return [r.id,r.date,r.supplier,r.branch,r.gross,r.returned,r.net,r.paid,r.due,r.status,r.paymentStatus];})),'procurement-overview');};
+  window.povExport=function(){var records=filtered(buildRecords());exportRows([['Reference','Date','Supplier','Branch','Purchase Value','Supplier Returns','Net Purchase Value','Paid to Suppliers','Invoiced Balance Due','Procurement Status','Payment Status']].concat(records.map(function(r){return [r.id,r.date,r.supplier,r.branch,money(r.gross),money(r.returned),money(r.net),money(r.paid),money(r.due),r.status,r.paymentStatus];})),'procurement-overview');};
   function captureOrders(){Object.keys(window.lpoData).forEach(function(id){ledger.orders[id]=orderInfo(id,window.lpoData[id]);});persist();snapshotCosts();}
   var originalSubmitOrder=window.submitLpoCreate;
   window.submitLpoCreate=function(){var result=originalSubmitOrder.apply(this,arguments);captureOrders();return result;};
@@ -293,7 +293,7 @@
   window.submitRecordInvoice=function(){
     var id=document.getElementById('ri-invoice-number').value.trim()||'INV-DFL-00845',reference=ref(document.getElementById('ri-lpo-select').value),supplier=document.getElementById('ri-supplier-select').value;
     var inputDate=document.querySelector('#view-record-invoice input[type="date"]');
-    var items=Array.from(document.querySelectorAll('#ri-line-tbody tr')).map(function(row){var qty=row.querySelector('.ri-qty-input'),cost=row.querySelector('.ri-cost-input');if(!qty||!cost)return null;var name=row.cells[1].textContent.trim(),known=linesForRef(reference).find(function(it){return it.name===name;});return {name:name,qtyPurchased:Number(qty.value)||0,unitCost:Number(cost.value)||0,unit:known&&known.unit||'units'};}).filter(Boolean);
+    var items=Array.from(document.querySelectorAll('#ri-line-tbody tr')).map(function(row){var qty=row.querySelector('.ri-qty-input'),cost=row.querySelector('.ri-cost-input');if(!qty||!cost)return null;var name=row.cells[1].textContent.trim(),known=linesForRef(reference).find(function(it){return it.name===name;});return {name:name,qtyPurchased:Number(qty.value)||0,unitCost:cropMarket.read(cost)||0,unit:known&&known.unit||'units'};}).filter(Boolean);
     var invoice={id:id,po:reference,supplier:supplier,recordedAt:new Date().toISOString(),date:inputDate&&inputDate.value||today(),dueDate:document.getElementById('ri-due-date').value,total:amount(document.getElementById('ri-total-due').textContent),paid:0,items:items,branch:(window.lpoData[reference]||{}).branch||''};
     var result=originalSubmitInvoice.apply(this,arguments);
     if(!ledger.invoices[id]){ledger.invoices[id]=invoice;persist();snapshotCosts();}

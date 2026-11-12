@@ -6,7 +6,7 @@
   var billing = 'monthly', chosenPlan = 1, hasChosenPlan = false, terminalPaid = false;
   var referencePlans=window.cropLandingData&&window.cropLandingData.plans;
   var prices = referencePlans?referencePlans.map(function(p){return p.monthly;}):[58500,133500,223500], planNames = ['Starter','Business','Enterprise'];
-  var money = function (n) { return '₦' + n.toLocaleString('en-NG'); };
+  var money = function (n) { return window.cropMarket.format(n,0); };
   function byId(id) { return document.getElementById(id); }
   function newView(id,html) { var el = document.createElement('div'); el.id = 'view-'+id; el.className = 'view ob-view'; el.innerHTML = html; document.body.appendChild(el); return el; }
   function field(label,id,type,required) { return '<div class="ob-field"><label for="'+id+'">'+label+'</label><input id="'+id+'" type="'+(type||'text')+'"'+(required?' required':'')+'></div>'; }
@@ -23,7 +23,7 @@
   plans.querySelector('.onboarding-box').insertAdjacentHTML('beforeend','<button type="button" class="signin-back ob-home" data-ob-go="landing">← Back to home</button>');
   function amountDue() { return billing==='annually' ? (referencePlans?referencePlans[chosenPlan].annualTotal:prices[chosenPlan]*12*.8) : prices[chosenPlan]; }
   function updatePrice() {
-    planCard.querySelectorAll('.plan-card').forEach(function (card,i) { card.querySelector('.amt').textContent=money(billing==='annually'?(referencePlans?referencePlans[i].annualPrice:prices[i]*.8):prices[i]);card.querySelector('.per').textContent=billing==='annually'?'/ mo, billed annually':'/ mo'; });
+    planCard.querySelectorAll('.plan-card').forEach(function (card,i) { card.querySelector('.amt').textContent=money(billing==='annually'?(referencePlans?referencePlans[i].annualTotal:prices[i]*12*.8):prices[i]);card.querySelector('.per').textContent=billing==='annually'?'/ year':'/ mo'; });
     byId('btn-monthly').classList.toggle('active',billing==='monthly');byId('btn-annually').classList.toggle('active',billing==='annually');
     byId('btn-monthly').setAttribute('aria-pressed',String(billing==='monthly'));byId('btn-annually').setAttribute('aria-pressed',String(billing==='annually'));
     signup.querySelector('.signin-submit').textContent='Make Payment ('+money(amountDue())+')';
@@ -92,5 +92,6 @@
   window.selectCropOnboardingPlan=function(index,cycle){if(!Number.isInteger(index)||index<0||index>=prices.length)return;chosenPlan=index;billing=cycle==='annually'?'annually':'monthly';hasChosenPlan=true;updatePrice();window.showView('signup');};
   var original=window.showView;
   window.showView=function(name){if(name==='signup'&&!hasChosenPlan)name='plans';return original.call(this,name);};
+  window.addEventListener('crop-market-ready',updatePrice);
   updatePrice();
 }());

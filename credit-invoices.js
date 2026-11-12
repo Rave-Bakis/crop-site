@@ -19,7 +19,7 @@
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function today() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
   function uid(prefix) { return prefix + '-' + crypto.randomUUID(); }
-  function money(n) { return '₦' + Number(n).toLocaleString('en-NG', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function money(n) { return window.cropMarket.format(n,2); }
   function round(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
   function date(v) { return v ? new Date(v + 'T12:00:00').toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
   function validDate(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v)) && new Date(v+'T12:00:00Z').toISOString().slice(0,10) === v; }
@@ -81,7 +81,7 @@
   function refreshCustomers(id){ document.getElementById('ci-customer').innerHTML=customerOptions();document.getElementById('ci-customer').value=id||'';ciSelectCustomer();renderPosCustomers(); }
 
   // Keep preview amounts identical to the persisted invoice, including kobo.
-  window.gisLineTotal=function(row){var total=round((Number(row.querySelector('.gis-qty').value)||0)*(Number(row.querySelector('.gis-price').value)||0));row.querySelector('.gis-line-total').textContent=money(total);return total;};
+  window.gisLineTotal=function(row){var total=round((Number(row.querySelector('.gis-qty').value)||0)*(cropMarket.parse(row.querySelector('.gis-price').value)||0));row.querySelector('.gis-line-total').textContent=money(total);return total;};
   window.gisRecalcTotals=function(){var subtotal=round(Array.from(document.querySelectorAll('#gis-items-body .gis-item-row')).reduce(function(sum,row){return sum+gisLineTotal(row);},0)),vat=round(subtotal*0.075);document.getElementById('gis-subtotal').textContent=money(subtotal);document.getElementById('gis-vat').textContent=money(vat);document.getElementById('gis-total').textContent=money(round(subtotal+vat));};
   gisRecalcTotals();
 
@@ -123,7 +123,7 @@
     if(!c){alert('Select a customer or create a customer profile first.');return null;}
     var issued=val('gis-inv-date'),due=val('gis-due-date');
     if(!validDate(issued)||!validDate(due)||due<issued){alert('Enter valid invoice and due dates. The due date cannot be before the invoice date.');return null;}
-    var items=Array.from(document.querySelectorAll('#gis-items-body .gis-item-row')).map(function(row){var desc=row.querySelector('.gis-desc-input');return {description:desc?desc.value.trim():'',quantity:Number(row.querySelector('.gis-qty').value),unitPrice:Number(row.querySelector('.gis-price').value)};});
+    var items=Array.from(document.querySelectorAll('#gis-items-body .gis-item-row')).map(function(row){var desc=row.querySelector('.gis-desc-input');return {description:desc?desc.value.trim():'',quantity:Number(row.querySelector('.gis-qty').value),unitPrice:cropMarket.parse(row.querySelector('.gis-price').value)};});
     if(!items.length||items.some(function(i){return !i.description||!Number.isFinite(i.quantity)||i.quantity<=0||!Number.isFinite(i.unitPrice)||i.unitPrice<=0||!Number.isFinite(i.quantity*i.unitPrice);})){alert('Add a description, a quantity above zero and a unit price above zero for every invoice item.');return null;}
     items.forEach(function(i){i.total=round(i.quantity*i.unitPrice);});
     var subtotal=round(items.reduce(function(sum,i){return sum+i.total;},0)),vat=round(subtotal*0.075);
@@ -240,16 +240,16 @@
     ['full','half','partial'].forEach(function(kind,index){var button=document.createElement('button');button.type='button';button.className='recpay-seg-btn'+(kind==='full'?' active':'');button.textContent=['Full Payment','Half Payment','Partial Payment'][index];button.dataset.type=kind;button.disabled=kind==='half'&&balance(i)<0.02;button.setAttribute('aria-pressed',String(kind==='full'));button.onclick=function(){typeSelect.value=kind;typeSelect.onchange();};segments.appendChild(button);});
     typeSelect.insertAdjacentElement('afterend',segments);
     var amountInput=document.getElementById('ci-paid-amount'),typeInput=document.getElementById('ci-payment-type');
-    amountInput.min='0.01';amountInput.max=balance(i).toFixed(2);amountInput.step='0.01';
+    amountInput.min='0.01';amountInput.max=cropMarket.input(balance(i));amountInput.step='0.01';
     function updatePaymentPreview(reset){
       var kind=typeInput.value;
       paymentOverlay.querySelectorAll('.recpay-seg-btn').forEach(function(button){button.classList.toggle('active',button.dataset.type===kind);button.setAttribute('aria-pressed',String(button.dataset.type===kind));});
       amountInput.readOnly=kind!=='partial';
       amountInput.classList.toggle('readonly',amountInput.readOnly);
-      if(kind==='full')amountInput.value=balance(i).toFixed(2);
-      else if(kind==='half')amountInput.value=(Math.floor(Math.round(balance(i)*100)/2)/100).toFixed(2);
+      if(kind==='full')amountInput.value=cropMarket.input(balance(i));
+      else if(kind==='half')amountInput.value=cropMarket.input(Math.floor(Math.round(balance(i)*100)/2)/100);
       else if(reset)amountInput.value='';
-      var amount=Number(amountInput.value);
+      var amount=kind==='full'?balance(i):kind==='half'?Math.floor(Math.round(balance(i)*100)/2)/100:cropMarket.parse(amountInput.value);
       document.getElementById('ci-payment-preview').textContent=Number.isFinite(amount)&&amount>0&&amount<=balance(i)?'Balance after this payment: '+money(round(balance(i)-amount)):'Enter an amount above zero, up to '+money(balance(i))+'.';
       document.getElementById('ci-record-payment').textContent=kind==='full'?'Record Full Payment':kind==='half'?'Record Half Payment':'Record Partial Payment';
       document.getElementById('ci-confirm-paid').checked=false;
@@ -266,10 +266,10 @@
       if(!canRecordPayment()){alert('Only the business owner or an admin can record payment.');return;}
       var current=state.invoices.find(function(x){return x.id===id;});
       if(!current||balance(current)===0)return;
-      var paidDate=val('ci-paid-date'),method=val('ci-paid-method'),kind=typeInput.value,amount=Number(amountInput.value),remaining=balance(current);
+      var paidDate=val('ci-paid-date'),method=val('ci-paid-method'),kind=typeInput.value,amount=kind==='full'?balance(current):kind==='half'?Math.floor(Math.round(balance(current)*100)/2)/100:cropMarket.parse(amountInput.value),remaining=balance(current);
       if(!validDate(paidDate)||paidDate<current.date||paidDate>today()||!method||!document.getElementById('ci-confirm-paid').checked){alert('Confirm receipt and enter a valid payment date and method.');return;}
       var amountInKobo=amount*100;
-      if(!['full','half','partial'].includes(kind)||!Number.isFinite(amount)||amount<0.01||amount>remaining||Math.abs(amountInKobo-Math.round(amountInKobo))>0.000001){alert('Enter an amount above zero, no more than the outstanding balance, with at most two decimal places.');return;}
+      if((kind==='partial'&&!cropMarket.validInput(amountInput.value))||!['full','half','partial'].includes(kind)||!Number.isFinite(amount)||amount<0.01||amount>remaining||Math.abs(amountInKobo-Math.round(amountInKobo))>0.000001){alert('Enter an amount above zero, no more than the outstanding balance, with at most two decimal places.');return;}
       amount=round(amount);
       if((kind==='full'&&amount!==remaining)||(kind==='half'&&amount!==Math.floor(Math.round(remaining*100)/2)/100)){alert('The amount does not match the selected payment type. Please select the payment type again.');return;}
       var file=proofInput.files[0],reference=val('ci-paid-reference'),notes=val('ci-payment-notes');

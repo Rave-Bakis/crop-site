@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="crop-market.js"></script>
+<link rel="stylesheet" href="crop-market.css">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>C.R.O.P — ChiwiQ Retail Operation Platform</title>
@@ -12579,7 +12581,7 @@ function openCloseSessionModal(){
 function closeCloseSessionModal(){ document.getElementById('closesess-modal-overlay').classList.remove('open'); }
 function updateCloseSessionVariance(){
   var input = document.getElementById('closesess-cash-count');
-  var raw = input ? parseFloat(input.value) : NaN;
+  var raw = input ? cropMarket.parse(input.value) : NaN;
   var actual = isNaN(raw) ? 0 : raw;
   var variance = actual - CLOSESESS_EXPECTED_DRAWER;
   var wrap = document.getElementById('closesess-variance-wrap');
@@ -12676,7 +12678,7 @@ function selectRecpayType(el, type){
   el.classList.add('active');
   var amountInput = document.getElementById('recpay-amount');
   if(type === 'full'){
-    amountInput.value = '182000';
+    amountInput.value = cropMarket.input(182000);
     amountInput.classList.add('readonly');
     amountInput.disabled = true;
   } else {
@@ -12785,7 +12787,7 @@ function populateInvoiceLineItemsFromLpo(select){
       + '<td style="color:#94a3b8;font-size:13px;">' + (i + 1) + '</td>'
       + '<td style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:13px;color:#111827;">' + item.name + '</td>'
       + '<td><input type="number" class="np-input ri-qty-input" value="' + item.qty + '" oninput="recalcInvoiceTotals()"></td>'
-      + '<td><input type="number" class="np-input ri-cost-input" value="' + item.cost + '.00" step="0.01" oninput="recalcInvoiceTotals()"></td>'
+      + '<td><input type="number" class="np-input ri-cost-input" data-base-amount="' + item.cost + '" value="' + cropMarket.input(item.cost) + '" step="0.01" oninput="recalcInvoiceTotals()"></td>'
       + '<td class="right ri-line-total">—</td>'
       + '</tr>';
   }).join('');
@@ -12799,14 +12801,14 @@ function recalcInvoiceTotals(){
     var costInput = tr.querySelector('.ri-cost-input');
     if(!qtyInput || !costInput) return;
     var qty = parseFloat(qtyInput.value) || 0;
-    var cost = parseFloat(costInput.value) || 0;
+    var cost = cropMarket.read(costInput) || 0;
     var lineTotal = qty * cost;
     subtotal += lineTotal;
     var totalCell = tr.querySelector('.ri-line-total');
     if(totalCell) totalCell.textContent = fmtNaira(lineTotal);
   });
   var discountInput = document.getElementById('ri-discount-input');
-  var discount = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
+  var discount = discountInput ? (cropMarket.parse(discountInput.value) || 0) : 0;
   var vatToggle = document.getElementById('ri-vat-toggle');
   var vatOn = !vatToggle || !vatToggle.classList.contains('off');
   var vat = vatOn ? (subtotal - discount) * 0.075 : 0;
@@ -12829,8 +12831,7 @@ function selectGredAction(el){
 function openGraExpiryModal(){ document.getElementById('graexpiry-modal-overlay').classList.add('open'); }
 function closeGraExpiryModal(){ document.getElementById('graexpiry-modal-overlay').classList.remove('open'); }
 function fmtNaira(n){
-  var sign = n < 0 ? '-' : '';
-  return sign + '₦' + Math.abs(Math.round(n)).toLocaleString('en-NG');
+  return cropMarket.format(n,0);
 }
 
 function confirmGraExpiryDates(){
@@ -12842,7 +12843,7 @@ function confirmGraExpiryDates(){
     var ordered = parseFloat(tr.querySelector('.gra-ordered-qty').textContent) || 0;
     var qtyInputs = tr.querySelectorAll('.gra-received-input');
     var receivedQty = parseFloat(qtyInputs[0] ? qtyInputs[0].value : 0) || 0;
-    var costPrice = parseFloat(qtyInputs[1] ? qtyInputs[1].value : 0) || 0;
+    var costPrice = cropMarket.read(qtyInputs[1]) || 0;
     expected += ordered * costPrice;
     received += receivedQty * costPrice;
 
@@ -13028,7 +13029,7 @@ function submitRecordInvoice(){
     window.registerSupplierReturnInvoice({
       id: invoiceNumber,
       po: lpoRef,
-      total: parseFloat(totalDue.replace(/[^0-9.]/g, '')) || 0,
+      total: cropMarket.parse(totalDue) || 0,
       dueDate: dueDate !== '—' ? dueDate : ''
     });
   }
@@ -13072,13 +13073,13 @@ function recalcPosOrderSummary(){
   rows.forEach(function(row){
     var cell = row.querySelector('.pos-subtotal');
     if(!cell) return;
-    var num = parseFloat(cell.textContent.replace(/[₦,]/g,'')) || 0;
+    var num = cropMarket.read(cell) || 0;
     subtotal += num;
   });
   var shipping = 12000;
   var tax = Math.round(subtotal * 0.08);
   var grandTotal = subtotal + shipping + tax;
-  function fmt(n){ return '₦'+n.toLocaleString('en-NG'); }
+  function fmt(n){ return cropMarket.format(n,0); }
   var summaryRows = document.querySelectorAll('#view-pos-sales .pos-summary-row');
   if(summaryRows[0]){ var b0 = summaryRows[0].querySelector('b'); if(b0) b0.textContent = fmt(subtotal); }
   if(summaryRows[2]){ var b2 = summaryRows[2].querySelector('b'); if(b2) b2.textContent = fmt(tax); }
@@ -13146,7 +13147,7 @@ function saveLoyaltyConfig(){
   var silverEl = document.getElementById('loyaltycfg-silver-threshold');
   var goldEl = document.getElementById('loyaltycfg-gold-threshold');
   var diamondEl = document.getElementById('loyaltycfg-diamond-threshold');
-  var rate = parseFloat(rateEl.value);
+  var rate = cropMarket.parse(rateEl.value);
   var min = parseFloat(minEl.value);
   var silver = parseFloat(silverEl.value);
   var gold = parseFloat(goldEl.value);
@@ -13181,7 +13182,7 @@ function updateRedeemPreview(){
   var value = pts * loyaltyConversionRate;
   valueEl.textContent = '₦' + value.toLocaleString('en-NG', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
-function formatNairaWhole(n){ return '₦' + Math.round(n).toLocaleString('en-NG'); }
+function formatNairaWhole(n){ return cropMarket.format(n,0); }
 
 var pendingLoyaltyRedemptions = {};
 
@@ -13235,7 +13236,7 @@ var posBundleProducts = {
 };
 var bundleSelectActiveKey = null;
 var bundleSelectActiveVariationIndex = null;
-function formatNairaDecimal(n){ return '₦' + n.toLocaleString('en-NG', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function formatNairaDecimal(n){ return cropMarket.format(n); }
 
 function openBundleSelectModal(key){
   var product = posBundleProducts[key];
@@ -14231,7 +14232,7 @@ function saveNewBranch(){
 /* ---------------- GENERATE INVOICE ---------------- */
 function gisLineTotal(row){
   var qty = parseFloat(row.querySelector('.gis-qty').value) || 0;
-  var price = parseFloat(row.querySelector('.gis-price').value) || 0;
+  var price = cropMarket.parse(row.querySelector('.gis-price').value) || 0;
   var total = qty * price;
   row.querySelector('.gis-line-total').textContent = formatNairaWhole(total);
   return total;
@@ -14354,7 +14355,7 @@ function selectPayMode(el, mode){
 function updateSplitTotal(){
   var rows = document.querySelectorAll('#pay-split-rows .pay-split-amount');
   var allocated = 0;
-  rows.forEach(function(r){ allocated += parseFloat(r.value.replace(/[^0-9.]/g,'')) || 0; });
+  rows.forEach(function(r){ allocated += cropMarket.parse(r.value) || 0; });
   var total = 25000;
   var remaining = total - allocated;
   document.getElementById('pay-split-allocated').textContent = '₦' + allocated.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -14412,10 +14413,10 @@ function recalcSplitCashForRow(amountInput){
 }
 function updateSplitCashChange(tenderedInput){
   var item = tenderedInput.closest('.pay-split-item');
-  var amount = parseFloat(item.querySelector('.pay-split-amount').value.replace(/[^0-9.]/g,'')) || 0;
-  var tendered = parseFloat(tenderedInput.value.replace(/[^0-9.]/g,'')) || 0;
+  var amount = cropMarket.parse(item.querySelector('.pay-split-amount').value) || 0;
+  var tendered = cropMarket.parse(tenderedInput.value) || 0;
   var change = tendered - amount;
-  var text = '₦' + Math.abs(change).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  var text = cropMarket.format(Math.abs(change));
   item.querySelector('.pay-split-cash-changeval').textContent = text;
   item.querySelector('.pay-split-cash-given').value = text;
 }
@@ -14473,9 +14474,9 @@ function completeSale(){
   showView('sale-success');
 }
 function updateChangeDue(){
-  var tendered = parseFloat(document.getElementById('pay-tendered').value.replace(/[^0-9.]/g,'')) || 0;
+  var tendered = cropMarket.parse(document.getElementById('pay-tendered').value) || 0;
   var due = tendered - 25000;
-  var text = '₦' + Math.abs(due).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  var text = cropMarket.format(Math.abs(due));
   document.getElementById('pay-change-due').textContent = text;
   document.getElementById('pay-change-given').value = text;
 }
@@ -14682,10 +14683,10 @@ function updateBundlePreview(scope){
   if(!sizeEl || !discEl || !priceEl || !unitEl) return;
   var size = parseFloat(sizeEl.value);
   var disc = parseFloat(discEl.value) || 0;
-  var unit = parseFloat((unitEl.value || '').toString().replace(/,/g,''));
+  var unit = cropMarket.parse(unitEl.value);
   if(!size || isNaN(unit)){ priceEl.value = ''; return; }
   var total = size * unit * (1 - disc/100);
-  priceEl.value = '₦ ' + total.toLocaleString('en-NG', {minimumFractionDigits:2, maximumFractionDigits:2});
+  priceEl.value = cropMarket.format(total);
 }
 
 var npVariationValueOptions = {
@@ -14810,7 +14811,7 @@ function renderVariationPackBadges(scope, id){
   var badgesEl = document.getElementById('var-pack-badges-' + id);
   if(!row || !badgesEl) return;
   var priceText = row.querySelector('.np-var-price').textContent;
-  var basePrice = parseFloat(priceText.replace(/[₦,\s]/g, '')) || 0;
+  var basePrice = cropMarket.parse(priceText) || 0;
   var rules = npBundleRules[scope] || [];
   var html = '';
   rules.forEach(function(rule, idx){
@@ -14826,7 +14827,7 @@ function renderVariationPackBadges(scope, id){
 function editVarPackOverride(scope, id, idx){
   var row = document.getElementById('var-row-' + id);
   var priceText = row.querySelector('.np-var-price').textContent;
-  var basePrice = parseFloat(priceText.replace(/[₦,\s]/g, '')) || 0;
+  var basePrice = cropMarket.parse(priceText) || 0;
   var rule = (npBundleRules[scope] || [])[idx];
   if(!rule) return;
   var computed = rule.size * basePrice * (1 - rule.discount / 100);

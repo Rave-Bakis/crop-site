@@ -11,7 +11,7 @@
   } catch(error) { storageError='GRA expense records could not be loaded. Restore browser storage before saving.'; }
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function clone(v){return JSON.parse(JSON.stringify(v));}
-  function money(v){return '₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function money(v){ return window.cropMarket.format(v,2); }
   function round(v){return Math.round((Number(v)+Number.EPSILON)*100)/100;}
   function number(v){return Number(String(v||'').replace(/[^\d.-]/g,''))||0;}
   function ref(v){return String(v||'').trim().replace(/^LPO-/,'PO-');}
@@ -37,9 +37,9 @@
     var existing=gras().find(function(g){return g.id===id&&ref(g.po)===po;});
     if(existing)return existing;
     var order=window.lpoData[po];
-    var items=Array.from(root.querySelectorAll('.grav-table tbody tr')).map(function(row){var name=row.querySelector('.gra-item-name'),qty=String(row.cells[1]?.textContent||'').split('/'),known=order?.items.find(function(it){return it.name===name?.textContent.trim();});return {name:name?.textContent.trim()||row.cells[0]?.textContent.trim()||'',qtyPurchased:number(qty[0]),qtyOrdered:number(qty[1]||qty[0]),unitCost:number(row.cells[2]?.textContent),unit:known?.unit||'units'};});
+    var items=Array.from(root.querySelectorAll('.grav-table tbody tr')).map(function(row){var name=row.querySelector('.gra-item-name'),qty=String(row.cells[1]?.textContent||'').split('/'),known=order?.items.find(function(it){return it.name===name?.textContent.trim();});return {name:name?.textContent.trim()||row.cells[0]?.textContent.trim()||'',qtyPurchased:number(qty[0]),qtyOrdered:number(qty[1]||qty[0]),unitCost:cropMarket.read(row.cells[2]),unit:known?.unit||'units'};});
     var total=root.querySelector('[id$="recvtotal"]');
-    return {id:id,po:po,supplier:f.Supplier||'',branch:f['Delivery Branch']||'',date:day(f['Actual Receipt Date']),status:root.id==='view-gra-processing-partial'?'Partially Matched':'Matched',items:items,receivedValue:total?number(total.textContent):round(items.reduce(function(s,it){return s+it.qtyPurchased*it.unitCost;},0))};
+    return {id:id,po:po,supplier:f.Supplier||'',branch:f['Delivery Branch']||'',date:day(f['Actual Receipt Date']),status:root.id==='view-gra-processing-partial'?'Partially Matched':'Matched',items:items,receivedValue:total?cropMarket.read(total):round(items.reduce(function(s,it){return s+it.qtyPurchased*it.unitCost;},0))};
   }
   function expenseRows(list){return '<div class="ge-table-wrap"><table class="gra-table grav-table"><thead><tr><th>Date</th><th>Category / Vendor</th><th>Description</th><th>Payment Method</th><th class="right">Amount</th><th>Receipt</th></tr></thead><tbody>'+list.map(function(e){return '<tr><td>'+displayDate(e.date)+'</td><td>'+esc(e.category)+'<small>'+esc(e.vendor)+'</small></td><td class="ge-description">'+esc(e.description)+'</td><td>'+esc(e.paymentMethod)+'</td><td class="right">'+money(e.amount)+'</td><td>'+(e.receipt?'<button type="button" class="ge-link" data-id="'+esc(e.id)+'" onclick="downloadGraExpenseReceipt(this.dataset.id)">Download Receipt</button><small>'+esc(e.receipt.name)+'</small>':'—')+'</td></tr>';}).join('')+'</tbody></table></div>';}
   function decorate(root){
@@ -68,9 +68,9 @@
     var busy=false;
     document.getElementById('ge-form').onsubmit=async function(event){
       event.preventDefault();if(busy)return;
-      var date=get('ge-date'),category=get('ge-category'),vendor=get('ge-vendor'),amount=Number(get('ge-amount')),method=get('ge-method'),description=get('ge-description'),error='';
+      var date=get('ge-date'),category=get('ge-category'),vendor=get('ge-vendor'),amount=cropMarket.parse(get('ge-amount')),method=get('ge-method'),description=get('ge-description'),error='';
       if(!date||date>today()||!category||!vendor||!method||!description)error='Complete the date, category, vendor, payment method and description.';
-      else if(!Number.isFinite(amount)||amount<0.01||!Number.isSafeInteger(Math.round(amount*100))||Math.abs(amount*100-Math.round(amount*100))>0.000001)error='Enter an amount above zero with at most two decimal places.';
+      else if(!cropMarket.validInput(get('ge-amount'))||!Number.isFinite(amount)||amount<0.01||!Number.isSafeInteger(Math.round(amount*100))||Math.abs(amount*100-Math.round(amount*100))>0.000001)error='Enter an amount above zero with at most two decimal places.';
       if(error){document.getElementById('ge-error').textContent=error;return;}
       var button=document.getElementById('ge-submit'),token=++submission,file=fileInput.files[0],actor=root.querySelector('.dash-user-name')?.textContent.trim()||'Admin';
       busy=true;button.disabled=true;button.textContent='Saving…';document.getElementById('ge-error').textContent='';
@@ -105,7 +105,7 @@
   var originalConfirm=window.confirmGraExpiryDates;
   window.confirmGraExpiryDates=function(){
     var pending=document.getElementById('view-gra-processing-detail'),heading=pending.querySelector('.gra-hero h1').textContent,po=ref(heading.match(/(?:LPO|PO)-[\w-]+/)?.[0]),order=window.lpoData[po],supplier=pending.querySelector('.gra-ref-chip')?.textContent.trim()||order?.supplier||'';
-    var items=Array.from(document.querySelectorAll('#gpd-items-table tbody tr')).map(function(row){var name=row.querySelector('.gra-item-name').childNodes[0].textContent.trim(),inputs=row.querySelectorAll('.gra-received-input'),known=order?.items.find(function(it){return it.name===name;});return {name:name,sku:row.querySelector('.gra-item-sku')?.textContent.replace(/^SKU:\s*/,'').trim()||'',unit:known?.unit||'units',qtyPurchased:Number(inputs[0].value),qtyOrdered:Number(row.querySelector('.gra-ordered-qty').textContent),unitCost:Number(inputs[1].value)};});
+    var items=Array.from(document.querySelectorAll('#gpd-items-table tbody tr')).map(function(row){var name=row.querySelector('.gra-item-name').childNodes[0].textContent.trim(),inputs=row.querySelectorAll('.gra-received-input'),known=order?.items.find(function(it){return it.name===name;});return {name:name,sku:row.querySelector('.gra-item-sku')?.textContent.replace(/^SKU:\s*/,'').trim()||'',unit:known?.unit||'units',qtyPurchased:Number(inputs[0].value),qtyOrdered:Number(row.querySelector('.gra-ordered-qty').textContent),unitCost:cropMarket.read(inputs[1])};});
     if(!po||!items.length||items.some(function(it){return !Number.isFinite(it.qtyPurchased)||it.qtyPurchased<0||!Number.isFinite(it.unitCost)||it.unitCost<0;})){alert('Check the received quantities and unit costs before confirming the GRA.');return;}
     var id='GRA-'+po,g={id:id,po:po,supplier:supplier,branch:order?.branch||'',date:today(),items:items,receivedValue:round(items.reduce(function(s,it){return s+it.qtyPurchased*it.unitCost;},0)),status:items.some(function(it){return it.qtyPurchased!==it.qtyOrdered;})?'Partially Matched':'Matched',recordedAt:new Date().toISOString(),recordedBy:pending.querySelector('.dash-user-name')?.textContent.trim()||'Admin'};
     var next=clone(data);next.gras[id]=g;var error=save(next);if(error){alert(error);return;}

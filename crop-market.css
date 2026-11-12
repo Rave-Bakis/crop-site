@@ -1,0 +1,5 @@
+.crop-country{display:inline-flex;align-items:center;gap:7px;border:1px solid #dce4ee;border-radius:8px;padding:7px 9px;background:#fff;color:#1b365f;min-height:40px;flex-shrink:0}
+.crop-country-flag{font-size:22px;line-height:1}.crop-country-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.crop-country select{font-weight:600;font-size:13px;font-family:inherit;color:inherit;background:transparent;border:0;cursor:pointer;width:52px;min-width:43px;padding:3px 0}.crop-country:focus-within{outline:2px solid #3182ce;outline-offset:3px}
+.crop-fx-note{font-size:12px!important;color:#64748b!important;text-align:center;padding:20px 20px 0;margin:0!important}.mkt-price-amount{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.mkt-price-billed{font-size:14px;color:#64748b;margin-top:8px}
+@media(max-width:600px){.crop-country{gap:4px;padding:5px}.crop-country-flag{font-size:19px}.crop-country select{font-size:12px;min-width:37px}.mkt-nav-right{gap:8px!important}.mkt-nav-right>.mkt-btn--sm{display:none!important}.mkt-price-amount{font-size:38px!important}}

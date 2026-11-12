@@ -10,7 +10,7 @@
   var invoices=load(invoiceKey).filter(function(i){return i&&!!poData[i.po];});
   function persist(){try{localStorage.setItem(returnKey,JSON.stringify(returns));localStorage.setItem(invoiceKey,JSON.stringify(invoices));}catch(e){}}
   function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-  function money(n){return '₦'+Math.round(Number(n)||0).toLocaleString('en-NG');}
+  function money(n){ return window.cropMarket.format(n,0); }
   function dateText(d){var value=new Date(d);return isNaN(value.getTime())?'—':value.toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'});}
   function poTotal(po){return poData[po].items.reduce(function(n,it){return n+it.qtyPurchased*it.unitCost;},0);}
   function returnLines(po){return returns.filter(function(r){return r.po===po&&r.status==='Dispatched';});}
