@@ -1,6 +1,6 @@
-// C.R.O.P tutorial library. Titles match the supplied video filenames.
-window.cropHelpResources = [
-  {
+// Introductory videos appear in the landing and workspace setup flows.
+window.cropIntroVideos = {
+  "welcome": {
     "id": "tutorial-01",
     "title": "Welcome to CROP - Create and access your account",
     "category": "Getting Started",
@@ -9,7 +9,7 @@ window.cropHelpResources = [
     "poster": "assets/tutorials/tutorial-01.jpg",
     "duration": "2:05"
   },
-  {
+  "business": {
     "id": "tutorial-02",
     "title": "Set up your business",
     "category": "Getting Started",
@@ -17,7 +17,11 @@ window.cropHelpResources = [
     "src": "assets/tutorials/Set up your business.mp4",
     "poster": "assets/tutorials/tutorial-02.jpg",
     "duration": "2:10"
-  },
+  }
+};
+
+// Portal tutorial library. Titles match the supplied video filenames.
+window.cropHelpResources = [
   {
     "id": "tutorial-03",
     "title": "Configure C.R.O.P for your business",

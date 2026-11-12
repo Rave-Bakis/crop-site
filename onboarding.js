@@ -1,0 +1,96 @@
+(function () {
+  'use strict';
+  var signup = document.getElementById('view-signup');
+  if (!signup) return;
+  var asset = 'assets/figma-onboarding/';
+  var billing = 'monthly', chosenPlan = 1, hasChosenPlan = false, terminalPaid = false;
+  var referencePlans=window.cropLandingData&&window.cropLandingData.plans;
+  var prices = referencePlans?referencePlans.map(function(p){return p.monthly;}):[58500,133500,223500], planNames = ['Starter','Business','Enterprise'];
+  var money = function (n) { return '₦' + n.toLocaleString('en-NG'); };
+  function byId(id) { return document.getElementById(id); }
+  function newView(id,html) { var el = document.createElement('div'); el.id = 'view-'+id; el.className = 'view ob-view'; el.innerHTML = html; document.body.appendChild(el); return el; }
+  function field(label,id,type,required) { return '<div class="ob-field"><label for="'+id+'">'+label+'</label><input id="'+id+'" type="'+(type||'text')+'"'+(required?' required':'')+'></div>'; }
+  function nav(back,next,skip) { return '<div class="onboarding-nav split">'+(back?'<button type="button" class="onboarding-back" data-ob-go="'+back+'">Back</button>':'<span></span>')+'<div class="right-group">'+(skip?'<button type="button" class="onboarding-skip" data-ob-go="'+next+'">Skip</button>':'')+'<button type="button" class="onboarding-continue" data-ob-next="'+next+'">Continue</button></div></div>'; }
+  function progress(step) { var percent = Math.round(step / 8 * 100); return '<div class="onboarding-progress-row"><span>Step '+step+' of 8</span><span>'+percent+'%</span></div><div class="onboarding-progress-track" role="progressbar" aria-label="Workspace setup" aria-valuemin="0" aria-valuemax="8" aria-valuenow="'+step+'"><div class="onboarding-progress-fill" style="width:'+percent+'%"></div></div>'; }
+  // Reuse the existing pricing components, then move plan selection before account creation.
+  var planCard = byId('view-onboarding7').querySelector('.onboarding-card');
+  var plans = newView('plans','<div class="onboarding-wrap"><div class="onboarding-box wide"></div></div>');
+  plans.querySelector('.onboarding-box').appendChild(planCard);
+  planCard.querySelectorAll('.plan-select').forEach(function (btn,i) { btn.type='button'; btn.onclick=function () { chosenPlan=i;hasChosenPlan=true;updatePrice();window.showView('signup'); }; });
+  if(referencePlans) planCard.querySelectorAll('.plan-card').forEach(function(card,index){var plan=referencePlans[index];card.querySelector('.plan-desc').textContent=plan.desc;var ul=card.querySelector('.plan-features');ul.replaceChildren();plan.features.forEach(function(value){var li=document.createElement('li'),check=document.createElement('span');check.className='chk';check.textContent='✓';li.append(check,document.createTextNode(value));ul.appendChild(li);});var tags=card.querySelector('.plan-tags');tags.replaceChildren();plan.modules.forEach(function(value){var span=document.createElement('span');span.textContent=value;tags.appendChild(span);});});
+  var icons=['22719.svg','307cd.svg','0123d.svg','801a1.svg','b9274.svg','c84ca.svg','b97e8.svg','0fd01.svg','e0506.svg','329a2.svg','367f5.svg','cbb93.svg','3a59e.svg','ab44f.svg'];
+  planCard.querySelectorAll('.plan-features .chk').forEach(function (span,i) { var img=document.createElement('img');img.src=asset+icons[i];img.alt='';img.className='ob-plan-check';span.replaceWith(img); });
+  plans.querySelector('.onboarding-box').insertAdjacentHTML('beforeend','<button type="button" class="signin-back ob-home" data-ob-go="landing">← Back to home</button>');
+  function amountDue() { return billing==='annually' ? (referencePlans?referencePlans[chosenPlan].annualTotal:prices[chosenPlan]*12*.8) : prices[chosenPlan]; }
+  function updatePrice() {
+    planCard.querySelectorAll('.plan-card').forEach(function (card,i) { card.querySelector('.amt').textContent=money(billing==='annually'?(referencePlans?referencePlans[i].annualPrice:prices[i]*.8):prices[i]);card.querySelector('.per').textContent=billing==='annually'?'/ mo, billed annually':'/ mo'; });
+    byId('btn-monthly').classList.toggle('active',billing==='monthly');byId('btn-annually').classList.toggle('active',billing==='annually');
+    byId('btn-monthly').setAttribute('aria-pressed',String(billing==='monthly'));byId('btn-annually').setAttribute('aria-pressed',String(billing==='annually'));
+    signup.querySelector('.signin-submit').textContent='Make Payment ('+money(amountDue())+')';
+    byId('ob-plan-summary').textContent=planNames[chosenPlan]+' · '+(billing==='annually'?'Annual billing':'Monthly billing');
+  }
+  window.setBilling=function (mode) { billing=mode==='annually'?'annually':'monthly';updatePrice(); };
+  signup.classList.add('ob-view');byId('view-signin').classList.add('ob-view');
+  var signupForm=signup.querySelector('form');signup.querySelector('.signin-submit').removeAttribute('onclick');
+  signup.querySelector('.sub').insertAdjacentHTML('afterend','<button type="button" id="ob-plan-summary" class="ob-plan-summary" data-ob-go="plans"></button>');
+  var signupInputs=signupForm.querySelectorAll('input:not([type="checkbox"]),select');
+  ['ob-full-name','ob-email','ob-password','ob-company','ob-business-type','ob-country','ob-phone'].forEach(function (id,i) { var input=signupInputs[i];input.id=id;input.required=i<6;var label=input.parentElement.querySelector('label');if(label) label.htmlFor=id; });
+  byId('ob-password').minLength=8;byId('ob-password').autocomplete='new-password';byId('ob-email').autocomplete='email';byId('ob-full-name').autocomplete='name';byId('ob-company').autocomplete='organization';byId('ob-phone').autocomplete='tel';
+  byId('agree-terms').required=true;
+  signup.querySelector('.signup-check').insertAdjacentHTML('beforebegin','<div class="ob-promo"><label for="ob-promo-code">Have a promo code?</label><div><input id="ob-promo-code" placeholder="E.G. LAUNCH30"><button type="button" id="ob-apply-promo">Apply</button></div><p id="ob-promo-message" role="status"></p></div>');
+  byId('ob-apply-promo').onclick=function () { byId('ob-promo-message').textContent=byId('ob-promo-code').value.trim()?'Promo codes can only be verified in live checkout.':'Enter a promo code to apply.'; };
+  signup.querySelector('.signin-foot span').textContent='Already have an account? ';
+  byId('view-signin').querySelector('.signin-foot a').onclick=function () { window.showView('plans'); };
+  var payment = byId('view-onboarding1');payment.classList.add('ob-view');
+  payment.innerHTML='<div class="signup-wrap"><div class="signup-card ob-payment-confirmed"><img class="ob-success" src="'+asset+'0f6dc.png" alt=""><h2>Payment Confirmed. Set Up<br>your Workspace</h2><p class="sub">Get started with just a few steps.</p><button type="button" class="intro-video-link intro-video-link--setup" data-intro-video="business"><span class="intro-play" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><path d="M6 3.5 14 9l-8 5.5V3.5Z"/></svg></span><span>How to set up your business</span></button><div class="onboarding-info"><b>Company:</b> <span class="ob-company-name">Hawkeye Foods</span></div><button type="button" class="signin-submit" data-ob-go="onboarding2">Continue</button><p class="ob-demo-note">Demo payment — no charge was made.</p></div></div>';
+  // Existing profile, branch, tax, receipt and invitation screens match these Figma forms.
+  [2,3,4,5,6].forEach(function (id) {
+    var root=byId('view-onboarding'+id);root.classList.add('ob-view');
+    root.querySelector('.onboarding-progress-row').outerHTML=progress(id-1);
+    // progress() supplies the complete track.
+    var tracks=root.querySelectorAll('.onboarding-progress-track');if(tracks[1])tracks[1].remove();
+    var next='onboarding'+(id+1), back=id===2?'onboarding1':'onboarding'+(id-1);
+    root.querySelector('.onboarding-nav').outerHTML=nav(id===2?'':back,next,true);
+  });
+  var profile=byId('view-onboarding2');var logoZone=profile.querySelector('.upload-dropzone');
+  logoZone.innerHTML='<label for="ob-logo" class="ob-logo-label"><span class="cam">📷</span><span class="hint">Upload your logo</span><span class="small">PNG, JPG up to 2MB</span><input id="ob-logo" type="file" accept="image/png,image/jpeg"></label><img id="ob-logo-preview" alt="Company logo preview" hidden><p id="ob-logo-error" role="alert"></p>';
+  profile.querySelector('.field-block input[type="text"]').id='ob-registration';
+  byId('view-onboarding3').querySelector('input').id='ob-branch';byId('ob-branch').required=true;byId('view-onboarding3').querySelector('textarea').id='ob-address';
+  byId('view-onboarding4').querySelector('select').id='ob-currency';var vat=byId('view-onboarding4').querySelector('input');vat.id='ob-vat';vat.min=0;vat.max=100;vat.step='0.01';
+  byId('view-onboarding5').querySelector('select').id='ob-receipt-layout';
+  byId('ob-receipt-layout').insertAdjacentHTML('afterbegin','<option value="" selected>Select</option>');
+  byId('ob-receipt-layout').onchange=function () { document.querySelector('.receipt-mock').classList.toggle('ob-compact',this.value==='Compact'); };
+  var team=byId('view-onboarding6').querySelector('textarea');team.id='ob-team';
+  team.oninput=function () { this.setCustomValidity(''); };
+  var paystack=byId('view-onboarding7');paystack.classList.add('ob-view');
+  paystack.innerHTML='<div class="onboarding-wrap"><div class="onboarding-box">'+progress(6)+'<div class="onboarding-card left"><h2>Paystack Connect</h2><p class="sub">Setup your virtual payment account by filling the form below. You can also opt in for a paid Physical Terminal by selecting the cash machine option.</p><div class="ob-bank-grid">'+field('Bank Name *','ob-bank','text',true)+field('Account Number *','ob-bank-account','text',true)+field('Account Name *','ob-bank-name','text',true)+field('Bank Code (Optional)','ob-bank-code','text',false)+'</div><div class="ob-terminal"><p>Card Machine (Optional)</p><button type="button" id="ob-terminal-toggle" aria-pressed="false"><img id="ob-terminal-icon" src="'+asset+'328a5.svg" alt=""><strong>Physical Terminal</strong><span>A card machine shipped to your branch for in-person payments.</span></button><div id="ob-terminal-details" hidden><label for="ob-terminal-qty">Quantity</label><div class="ob-quantity"><button type="button" id="ob-qty-minus" aria-label="Remove one terminal">-</button><input id="ob-terminal-qty" type="number" min="1" max="100" step="1" value="1"><button type="button" id="ob-qty-plus" aria-label="Add one terminal">+</button></div><label for="ob-terminal-address">Delivery Address *</label><textarea id="ob-terminal-address" placeholder="123 Main Street, City, State, ZIP"></textarea><div class="ob-terminal-line"><span>Unit Price</span><strong>₦45,000</strong></div><div class="ob-terminal-line"><span id="ob-terminal-count">Total (1 terminal)</span><strong id="ob-terminal-total">₦45,000</strong></div><button type="button" id="ob-terminal-pay" class="signin-submit">Pay ₦45,000</button><p id="ob-terminal-status" role="status"></p></div></div>'+nav('onboarding6','onboarding8',true)+'</div></div></div>';
+  byId('ob-bank-account').inputMode='numeric';byId('ob-bank-account').pattern='[0-9]{10}';byId('ob-bank-account').maxLength=10;byId('ob-bank-account').title='Enter a 10-digit bank account number';
+  var sales=byId('view-onboarding8');sales.classList.add('ob-view');
+  sales.innerHTML='<div class="onboarding-wrap"><div class="onboarding-box">'+progress(7)+'<div class="onboarding-card left"><h2>Sales Point</h2><p class="sub">Accept in person Bank-Transfer, card, and USSD payments with no hardware.</p><div class="field-block">'+field('Sales Point Name *','ob-sales-point','text',true)+'<div class="ob-bank-grid">'+field('Staff WhatsApp Number *','ob-staff-phone','tel',true)+field('Staff Name (Optional)','ob-staff-name','text',false)+'</div></div>'+nav('onboarding7','onboarding9',true)+'</div></div></div>';
+  var complete=newView('onboarding9','<div class="onboarding-wrap"><div class="onboarding-box">'+progress(8)+'<div class="onboarding-card ob-complete"><img class="ob-success" src="'+asset+'0f6dc.png" alt=""><h2>All Set!</h2><p class="sub">Your Smart POS workspace is ready. You can now start adding products, processing sales, and managing your business.</p><div class="onboarding-nextsteps"><h3>Recommended Next Steps:</h3><ul><li>✓ Add your first products to inventory</li><li>✓ Configure user roles and permissions</li><li>✓ Test your first POS transaction</li><li>✓ Explore reports and analytics</li></ul></div></div><div class="onboarding-nav split"><button type="button" class="onboarding-back" data-ob-go="onboarding8">Back</button><button type="button" class="onboarding-dashboard-btn" data-ob-go="dashboard">Go to Dashboard</button></div><p class="ob-save-status" role="status"></p></div></div>');
+  // Native labels and validation remain available to keyboards and assistive technology.
+  document.querySelectorAll('.ob-view .field-block input,.ob-view .field-block select,.ob-view .field-block textarea').forEach(function(input){var label=input.parentElement.querySelector('label');if(label&&input.id)label.htmlFor=input.id;});
+  var checkout=document.createElement('dialog');checkout.className='ob-checkout';checkout.setAttribute('aria-labelledby','ob-checkout-title');checkout.innerHTML='<h2 id="ob-checkout-title">Demo checkout</h2><p id="ob-checkout-description"></p><p>This prototype does not collect a payment or connect a bank account.</p><div><button type="button" id="ob-checkout-cancel">Cancel</button><button type="button" id="ob-checkout-confirm" class="signin-submit">Simulate successful payment</button></div>';document.body.appendChild(checkout);
+  var checkoutAction=null;
+  function openCheckout(description,fn){byId('ob-checkout-description').textContent=description;checkoutAction=fn;checkout.showModal();}
+  byId('ob-checkout-cancel').onclick=function(){checkoutAction=null;checkout.close();};
+  byId('ob-checkout-confirm').onclick=function(){var fn=checkoutAction;checkoutAction=null;checkout.close();if(fn)fn();};
+  signupForm.onsubmit=function(e){e.preventDefault();if(!signupForm.reportValidity())return false;openCheckout(planNames[chosenPlan]+' plan · '+money(amountDue())+' '+(billing==='annually'?'annually':'monthly'),function(){document.querySelectorAll('.ob-company-name,.receipt-mock .rname').forEach(function(el){el.textContent=byId('ob-company').value.trim();});byId('ob-password').value='';window.showView('onboarding1');});return false;};
+  var logoUrl='';
+  byId('ob-logo').onchange=async function(){var file=this.files[0],error=byId('ob-logo-error');error.textContent='';if(!file)return;if(!['image/png','image/jpeg'].includes(file.type)||file.size>2*1024*1024){error.textContent='Choose a PNG or JPG image up to 2MB.';this.value='';return;}var bytes=new Uint8Array(await file.slice(0,8).arrayBuffer());var valid=file.type==='image/png'?bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71:bytes[0]===255&&bytes[1]===216&&bytes[2]===255;if(!valid){error.textContent='This file is not a valid PNG or JPG image.';this.value='';return;}if(this.files[0]!==file)return;if(logoUrl)URL.revokeObjectURL(logoUrl);logoUrl=URL.createObjectURL(file);byId('ob-logo-preview').src=logoUrl;byId('ob-logo-preview').hidden=false;};
+  function terminalSelected(){return byId('ob-terminal-toggle').getAttribute('aria-pressed')==='true';}
+  function quantity(){return Math.max(1,Math.min(100,Math.floor(Number(byId('ob-terminal-qty').value)||1)));}
+  function terminalPrice(){var qty=quantity();byId('ob-terminal-qty').value=qty;terminalPaid=false;byId('ob-terminal-status').textContent='';byId('ob-terminal-count').textContent='Total ('+qty+' terminal'+(qty===1?'':'s')+')';byId('ob-terminal-total').textContent=money(qty*45000);byId('ob-terminal-pay').textContent='Pay '+money(qty*45000);}
+  byId('ob-terminal-toggle').onclick=function(){var selected=!terminalSelected();this.setAttribute('aria-pressed',String(selected));byId('ob-terminal-details').hidden=!selected;byId('ob-terminal-address').required=selected;byId('ob-terminal-icon').src=asset+(selected?'1f6e5.svg':'328a5.svg');terminalPaid=false;byId('ob-terminal-status').textContent='';};
+  byId('ob-qty-plus').onclick=function(){byId('ob-terminal-qty').value=quantity()+1;terminalPrice();};byId('ob-qty-minus').onclick=function(){byId('ob-terminal-qty').value=quantity()-1;terminalPrice();};byId('ob-terminal-qty').onchange=terminalPrice;byId('ob-terminal-address').oninput=function(){terminalPaid=false;byId('ob-terminal-status').textContent='';};
+  byId('ob-terminal-pay').onclick=function(){if(!validate(paystack))return;openCheckout(quantity()+' physical terminal(s) · '+money(quantity()*45000),function(){terminalPaid=true;byId('ob-terminal-status').textContent='Demo payment completed. No charge was made.';});};
+  function validate(root){if(root===byId('view-onboarding6')){var emails=team.value.split(',').map(function(v){return v.trim();}).filter(Boolean);var probe=document.createElement('input');probe.type='email';var invalid=emails.some(function(value){probe.value=value;return !probe.checkValidity();});team.setCustomValidity(invalid?'Enter valid email addresses separated by commas.':'');}var inputs=Array.from(root.querySelectorAll('input,select,textarea')).filter(function(input){return input.type!=='file'&&!input.closest('[hidden]');});for(var input of inputs){if(!input.reportValidity())return false;}return true;}
+  // Save only non-secret setup preferences. Passwords and banking details stay out of browser storage.
+  function savePreferences(){var ids=['ob-company','ob-business-type','ob-country','ob-registration','ob-branch','ob-address','ob-currency','ob-vat','rcpt-header','rcpt-footer','ob-receipt-layout','ob-sales-point'];var settings={plan:planNames[chosenPlan],billing:billing};ids.forEach(function(id){settings[id]=byId(id).value;});try{localStorage.setItem('crop-onboarding-settings-v2',JSON.stringify(settings));complete.querySelector('.ob-save-status').textContent='';}catch(error){complete.querySelector('.ob-save-status').textContent='Your setup could not be saved in this browser. Keep this tab open to retain your entries.';}}
+  document.querySelectorAll('.ob-view [data-ob-go]').forEach(function(btn){btn.onclick=function(){if(btn.dataset.obGo==='dashboard')savePreferences();window.showView(btn.dataset.obGo);};});
+  document.querySelectorAll('.ob-view [data-ob-next]').forEach(function(btn){btn.onclick=function(){var root=btn.closest('.view');if(!validate(root))return;if(root===paystack&&terminalSelected()&&!terminalPaid){byId('ob-terminal-status').textContent='Complete the demo terminal payment, or deselect Physical Terminal to continue without it.';return;}if(btn.dataset.obNext==='onboarding9')savePreferences();window.showView(btn.dataset.obNext);};});
+  window.selectCropOnboardingPlan=function(index,cycle){if(!Number.isInteger(index)||index<0||index>=prices.length)return;chosenPlan=index;billing=cycle==='annually'?'annually':'monthly';hasChosenPlan=true;updatePrice();window.showView('signup');};
+  var original=window.showView;
+  window.showView=function(name){if(name==='signup'&&!hasChosenPlan)name='plans';return original.call(this,name);};
+  updatePrice();
+}());
